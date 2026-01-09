@@ -1,0 +1,842 @@
+blueprint:
+  name: Präsenz-basierte Gerätesteuerung
+  description: |
+    Steuert Geräte basierend auf Bewegungs- und Präsenzmeldern.
+    Anwesenheit wird erkannt indem einer der ausgewählten Bewegungs- und/oder Präsenzmelder diese erkennt.
+    Die Abwesenheit wird erkannt, wenn ALLE ausgewählten Bewegungs- und/oder Präsenzmelder diese erkennen.
+    Die Auswahl der Bewegungssensoren kann entwerder einzeln (manuell) erfolgen, oder über selbst geschriebene Templates.
+    Beispieltemplates findest du in der Readme.
+    Anschließend wird/werden die unten angegebenen Actionen ausgeführt.
+    Eine mögliche Tag/Nacht Unterscheidung erfolgt über einen on/off-Entität (ON=Tag, OFF=Nacht).
+    Version: 2026.01.09c
+  domain: automation
+  author: Pezibaer82
+  input:
+
+    # === Filter-Einstellungen ===
+    manual_sensors:
+      name: Melder (manuell)
+      description: |-
+        Wähle die Bewegungs-/Präsenzmelder aus die für die Automation verwendet werden sollen.
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+              device_class: 
+                - motion
+                - occupancy
+                - presence
+    
+    filtered_sensors_template_on:
+      name: Anwesenheits-Melder (via Template-Filter / Status=on)
+      description: |-
+        Optional: Template zur automatischen Erkennung von ANWESENHEIT über Labels/Bereiche.
+        
+        Beispiele findest Du in der Readme.
+        HINWEIS: Wird nur verwendet wenn KEINE manuellen Melder ausgewählt sind!
+      default: "{{ none }}"
+      selector:
+        template:
+    
+    filtered_sensors_template_off:
+      name: Abwesenheits-Melder (via Template-Filter / Status=off)
+      description: |-
+        Optional: Template zur automatischen Erkennung von ABWESENHEIT über Labels/Bereiche.
+        
+        Beispiele findest Du in der Readme. 
+        Achtung: für die Abwesenheitserkennung muss am Ende des gewählten Beispieltemplate
+        "| count > 0" durch "| count == 0" ersetzt werden.
+
+        HINWEIS: Wird nur verwendet wenn KEINE manuellen Melder ausgewählt sind!
+      default: "{{ none }}"
+      selector:
+        template:
+
+    enable_switches:
+      name: Automation Aktivierung
+      description: |-
+        Wenn ALLE angegebenen Entities ON sind, wird die Automation ausgeführt.
+        Wenn einer OFF ist, wird die Automation NICHT ausgeführt.
+        (optional)
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain:
+                - switch
+                - input_boolean
+                - binary_sensor
+                - schedule
+    
+    # === Türkontakte ===
+    door_sensors:
+      name: Türkontakte
+      description: |-
+        Türkontakte für erweiterte Steuerung.
+        
+        **Funktion 1 - Bewegungsmelder-Bedingung:**
+        Bewegungsmelder triggern nur wenn mindestens EINE Tür geöffnet (ON) ist.
+        
+        **Funktion 2 - Tür-Trigger (nur wenn "Zu steuernde Entity" gesetzt):**
+        - Tür öffnet + Entity AUS → Licht sofort EIN
+        - Tür schließt → Doppelte Bewegungsprüfung (2x Wartezeit) → dann EIN oder AUS
+        - Tür geschlossen = Freeze-Modus (keine Änderungen durch Bewegungsmelder)
+        
+        (optional)
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - device_class: door
+            - device_class: window
+    
+    controlled_entity:
+      name: Zu steuernde Entity
+      description: |-
+        Mit dieser Entity-Angabe wird ein versehentliches z.B. Licht einschalten über die HA-APP ebenfalls überwacht. Ohne Angabe würde das Licht sich nicht von selbst wieder ausschalten, wenn niemand den Raum betritt.
+        
+        Zur Funktion 'Steuerung mittels Türkontakte':
+        Ohne Angabe dieser Entity funktionieren nur die Bewegungsmelder-Trigger. Die Steuerung über Türkontakte würde nicht funktionieren.
+        
+        (optional)
+      default: ""
+      selector:
+        entity:
+
+    # === Zeitsteuerung ===
+    day_night_switch:
+      name: Tag/Nacht Erkennung
+      description: |-
+        Hier kann man einen on/off Entität auswählen, der die Tag/Nacht Unterscheidung steuert.
+        ON/on/Active = Tag
+        OFF/off/Inactive = Nacht
+        Wenn "Sun Sun" ausgewählt (default) = keine Tag/Nacht Unterscheidung (nur Always-Actions werden ausgeführt)
+        (optional)
+      default: "sun.sun"
+      selector:
+        entity:
+          filter:
+            - domain:
+                - switch
+                - input_boolean
+                - binary_sensor
+                - schedule
+
+    # === Einschaltung ===
+    delay_turn_on:
+      name: Einschaltverzögerung
+      description: |-
+        Verzögerung in Sekunden nach erkannter Anwesenheit/Bewegung.
+        Action wird um X Sekunden verzögert ausgeführt.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 1
+          unit_of_measurement: "s"
+
+    action_turn_on_night:
+      name: Einschalt-Action Nacht
+      description: |-
+        Wird bei Anwesenheitserkennung in der Nacht ausgeführt (Tag/Nacht Switch OFF).
+        Wenn kein Tag/Nacht Switch angegeben ist, wird diese Action NICHT ausgeführt.
+        (optional)
+      default: []
+      selector:
+        action:
+
+    action_turn_on_day:
+      name: Einschalt-Action Tag
+      description: |- 
+        Wird bei Anwesenheitserkennung am Tag ausgeführt (Tag/Nacht Switch ON).
+        Wenn kein Tag/Nacht Switch angegeben ist, wird diese Action NICHT ausgeführt.
+        (optional)
+      default: []
+      selector:
+        action:
+    
+    action_turn_on_always:
+      name: Einschalt-Action Immer
+      description: |-
+        Wird IMMER bei Anwesenheitserkennung ausgeführt.
+        Bei Tag/Nacht Unterscheidung wird zuvor die entsprechende Tag/Nacht-Action durchgeführt.
+        (optional)
+      default: []
+      selector:
+        action:
+
+    # === Ausschaltung ===
+    sensor_delay:
+      name: Sensorverzögerung
+      description: |-
+        !! WICHTIG bei Verwendung von Türkontakten !!
+        Die Sensorverzögerung ist die Verzögerung des erkennens der Abwesenheit die durch den Bewegungsmelder selbst erzeugt wird.
+        Diese Verzögerung lässt sich in den Einstellungen der Bewegungssensoren selbst anpassen.
+        Für die Erkennung, ob sich nach dem schließen der Türe eine Person im Raum befindet ist diese Sensorverzögerung enorm entscheidend. Am besten man misst mehrmals die Zeit die der Sensor ab dem Verlassen des Raumes bis zum Ändern des Status benötigt. Die längst gemessene Zeit sollte hier dann angegeben werden.
+        Die Automation führt die Ausschalt-Actions bei verlassenen Raum und geschlossener Türe dann ca. nach dieser Sensorverzögerung durch.
+        Sollten KEINE Türkontakte angegeben sein, dann spielt der angegebene Wert keine Rolle in der Funktion dieser Automation.
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 1
+          unit_of_measurement: "s"
+
+    delay_turn_off:
+      name: Ausschaltverzögerung
+      description: |-
+        Verzögerung in Sekunden nach erkannter Abwesenheit.
+        Die Ausführung der Ausschalt-Actionen findet bei Abwesenheitserkennung durch die Triggerung von Bewegungssensoren nach ca. der "eingestellte Sensorverzögerung" + dieser "Ausschaltverzögerung" verzögert statt.
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 1
+          unit_of_measurement: "s"
+
+    action_turn_off_night:
+      name: Ausschalt-Action Nacht
+      description: |-
+        Wird bei Abwesenheitserkennung in der Nacht ausgeführt (Tag/Nacht Switch OFF).
+        Wenn kein Tag/Nacht Switch angegeben ist, wird diese Action NICHT ausgeführt.
+        (optional)
+      default: []
+      selector:
+        action:
+
+    action_turn_off_day:
+      name: Ausschalt-Action Tag
+      description: |-
+        Wird bei Abwesenheitserkennung am Tag ausgeführt (Tag/Nacht Switch ON).
+        Wenn kein Tag/Nacht Switch angegeben ist, wird diese Action NICHT ausgeführt.
+        (optional)
+      default: []
+      selector:
+        action:
+    
+    action_turn_off_always:
+      name: Ausschalt-Action Immer
+      description: |-
+        Wird IMMER bei Abwesenheitserkennung ausgeführt.
+        Bei Tag/Nacht Unterscheidung wird zuvor die entsprechende Tag/Nacht-Action durchgeführt.
+        (optional)
+      default: []
+      selector:
+        action:
+
+    # === Debug-Einstellungen ===
+    dry_run_mode:
+      name: Probelauf-Modus (Dry Run)
+      description: |-
+        Aktionen werden nicht ausgeführt. Der Modus liefert eine Zusammenfassung als Benachrichtigung über das Verhalten der Automation. 
+      default: false
+      selector:
+        boolean:
+
+variables:
+  # Automation Name
+  automation_name: "{{ this.attributes.friendly_name }}"
+  
+  # Debug-Variablen
+  dry_run_mode: !input dry_run_mode
+  
+  # Verzögerungs-Variablen
+  sensor_delay: !input sensor_delay  
+  delay_turn_on: !input delay_turn_on
+  delay_turn_off: !input delay_turn_off
+  
+  # Zeitsteuerungs-Variablen
+  day_night_switch: !input day_night_switch
+  enable_switches: !input enable_switches
+  
+  # Tür-Variablen
+  door_sensors: !input door_sensors
+  controlled_entity: !input controlled_entity
+  
+  # Filter-Variablen
+  manual_sensors: !input manual_sensors
+  
+  # Alle Sensoren = nur die manuell ausgewählten
+  all_sensors: "{{ manual_sensors }}"
+
+trigger:
+  - platform: template
+    value_template: !input filtered_sensors_template_on
+    id: template_presence_detected
+    alias: "Template: Anwesenheit erkannt"
+  
+  - platform: template
+    value_template: !input filtered_sensors_template_off
+    id: template_presence_cleared
+    alias: "Template: Abwesenheit erkannt"
+  
+  - platform: state
+    entity_id: !input manual_sensors
+    to: "on"
+    id: presence_detected
+    alias: "Melder: Anwesenheit erkannt"
+    for:
+      seconds: !input delay_turn_on
+  
+  - platform: state
+    entity_id: !input manual_sensors
+    to: "off"
+    id: presence_cleared
+    alias: "Melder: Abwesenheit erkannt"
+    for:
+      seconds: !input delay_turn_off
+  
+  - platform: state
+    entity_id: !input day_night_switch
+    to: "on"
+    id: day_night_changed
+    alias: "Tag/Nacht: Wechsel zu Tag"
+  
+  - platform: state
+    entity_id: !input day_night_switch
+    to: "off"
+    id: day_night_changed
+    alias: "Tag/Nacht: Wechsel zu Nacht"
+  
+  - platform: state
+    entity_id: !input enable_switches
+    id: enable_switch_changed
+    alias: "Automation: Ein-/Ausschalten"
+  
+  - platform: state
+    entity_id: !input door_sensors
+    to: "on"
+    id: door_opened
+    alias: "Tür: Geöffnet"
+  
+  - platform: state
+    entity_id: !input door_sensors
+    to: "off"
+    id: door_closed
+    alias: "Tür: Geschlossen"
+  
+  - platform: template
+    value_template: >-
+      {{ controlled_entity != '' and is_state(controlled_entity, 'on') }}
+    id: controlled_entity_turned_on
+    alias: "Gesteuerte Entity: Eingeschaltet"
+  
+  
+  - platform: homeassistant
+    event: start
+    id: ha_start
+    alias: "Home Assistant: Neustart"
+
+condition:
+  - condition: or
+    conditions:
+      - alias: Manueller-Sensor-Anwesenheit
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - presence_detected
+          - condition: template
+            value_template: |-
+              {% if door_sensors | length > 0 %}
+                {{ expand(door_sensors) | selectattr('state', 'eq', 'on') | list | length > 0 }}
+              {% else %}
+                true
+              {% endif %}
+            alias: nur wenn Türen geöffnet sind
+      
+      - alias: "Template-Sensor-Anwesenheit "
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - template_presence_detected
+          - condition: template
+            value_template: "{{ manual_sensors | length == 0 }}"
+            alias: nur wenn kein manueller Melder ausgewählt
+          - condition: template
+            value_template: |-
+              {% if door_sensors | length > 0 %}
+                {{ expand(door_sensors) | selectattr('state', 'eq', 'on') | list | length > 0 }}
+              {% else %}
+                true
+              {% endif %}
+            alias: nur wenn Türen geöffnet sind
+      
+      - alias: Manueller-Sensor-Abwesenheit
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - presence_cleared
+          - alias: alle Sensoren Abwesenheit erkannt
+            condition: template
+            value_template: >-
+              {{ manual_sensors | expand | rejectattr('state', 'in',
+              ['unavailable', 'unknown']) | map(attribute='state') |
+              select('eq', 'on') | list | length == 0 }}
+          - condition: template
+            value_template: |-
+              {% if door_sensors | length > 0 %}
+                {{ expand(door_sensors) | selectattr('state', 'eq', 'on') | list | length > 0 }}
+              {% else %}
+                true
+              {% endif %}
+            alias: nur wenn Türen geöffnet sind
+      
+      - alias: Template-Sensor-Abwesenheit
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - template_presence_cleared
+          - condition: template
+            value_template: "{{ manual_sensors | length == 0 }}"
+            alias: nur wenn kein manueller Melder ausgewählt
+          - condition: template
+            value_template: |-
+              {% if door_sensors | length > 0 %}
+                {{ expand(door_sensors) | selectattr('state', 'eq', 'on') | list | length > 0 }}
+              {% else %}
+                true
+              {% endif %}
+            alias: nur wenn Türen geöffnet sind
+      
+      - alias: Day/Night Wechsel
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - day_night_changed
+          - condition: template
+            value_template: "{{ day_night_switch != 'sun.sun' }}"
+            alias: Nur wenn "Tag/Nacht Erkennung" nicht sun.sun
+      
+      - alias: Automation Ein-/Ausschalten
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - enable_switch_changed
+          - condition: template
+            value_template: |-
+              {% if enable_switches | length > 0 %}
+                {{ expand(enable_switches) | selectattr('state', 'eq', 'off') | list | length == 0 }}
+              {% else %}
+                false
+              {% endif %}
+            alias: Nur wenn Alle switchen "on" sind, oder default angegeben
+          - condition: template
+            value_template: |-
+              {% if manual_sensors | length > 0 %}
+                {{ manual_sensors | expand | rejectattr('state', 'in', ['unavailable', 'unknown']) | map(attribute='state') | select('eq', 'on') | list | count == 0 }}
+              {% else %}
+                {{ not filtered_sensors_template_on }}
+              {% endif %}
+            alias: nur bei Abwesenheit
+      
+      
+      - alias: Gesteuerte Entity eingeschaltet bei Abwesenheit
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - controlled_entity_turned_on
+          - condition: or
+            conditions:
+              # Manuelle Sensoren: Alle OFF
+              - condition: and
+                conditions:
+                  - condition: template
+                    value_template: "{{ manual_sensors | length > 0 }}"
+                    alias: manuelle Sensoren sind ausgewählt
+                  - condition: template
+                    value_template: >-
+                      {{ manual_sensors | expand 
+                         | rejectattr('state', 'in', ['unavailable', 'unknown']) 
+                         | map(attribute='state') 
+                         | select('eq', 'on') 
+                         | list | length == 0 }}
+                    alias: alle manuellen Sensoren zeigen Abwesenheit
+              
+              # Template-Sensor: OFF
+              - condition: and
+                conditions:
+                  - condition: template
+                    value_template: "{{ manual_sensors | length == 0 }}"
+                    alias: keine manuellen Sensoren ausgewählt
+                  - condition: template
+                    value_template: "{{ not filtered_sensors_template_on }}"
+                    alias: Template-Sensor zeigt Abwesenheit
+      - alias: Tür öffnen/schließen
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - door_opened
+              - door_closed
+          - condition: template
+            value_template: "{{ controlled_entity != '' }}"
+            alias: nur wenn "Zu steuernde Entity" angegeben
+  
+  - condition: template
+    value_template: |-
+      {% if enable_switches | length > 0 %}
+        {{ expand(enable_switches) | selectattr('state', 'eq', 'off') | list | length == 0 }}
+      {% else %}
+        true
+      {% endif %}
+    alias: Automation Aktivierung - alle enable_switches müssen ON sein
+
+action:
+  - choose:
+
+      # ========================================
+      # Fall 1 - Tag/Nacht Wechsel
+      # ========================================
+      - alias: Fall 1 - Tag/Nacht Wechsel
+        conditions:
+          - condition: template
+            value_template: "{{ dry_run_mode == false }}"
+          - condition: trigger
+            id: day_night_changed
+        sequence:
+          - choose:
+              # Fall 1.1: Nacht→Tag + Abwesenheit
+              - alias: Fall 1.1 - Nacht auf Tag & Abwesenheit
+                conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ (trigger.to_state.state == 'on' and trigger.from_state.state == 'off') and
+                         ((manual_sensors | expand | rejectattr('state', 'in', ['unavailable', 'unknown']) | map(attribute='state') | select('eq', 'on') | list | count == 0) if manual_sensors | length > 0 else (not filtered_sensors_template_on)) }}
+                sequence:
+                  - choose: []
+                    default: !input action_turn_off_night
+              
+              # Fall 1.2: Nacht→Tag + Anwesenheit
+              - alias: Fall 1.2 - Nacht auf Tag & Anwesenheit
+                conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ (trigger.to_state.state == 'on' and trigger.from_state.state == 'off') and
+                         ((manual_sensors | expand | rejectattr('state', 'in', ['unavailable', 'unknown']) | map(attribute='state') | select('eq', 'on') | list | count > 0) if manual_sensors | length > 0 else filtered_sensors_template_on) }}
+                sequence:
+                  - choose: []
+                    default: !input action_turn_off_night
+                  - choose: []
+                    default: !input action_turn_on_day
+              
+              # Fall 1.3: Tag→Nacht + Abwesenheit
+              - alias: Fall 1.3 - Tag auf Nacht & Abwesenheit
+                conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ (trigger.to_state.state == 'off' and trigger.from_state.state == 'on') and
+                         ((manual_sensors | expand | rejectattr('state', 'in', ['unavailable', 'unknown']) | map(attribute='state') | select('eq', 'on') | list | count == 0) if manual_sensors | length > 0 else (not filtered_sensors_template_on)) }}
+                sequence:
+                  - choose: []
+                    default: !input action_turn_off_day
+              
+              # Fall 1.4: Tag→Nacht + Anwesenheit
+            default:
+              - choose: []
+                default: !input action_turn_off_day
+              - choose: []
+                default: !input action_turn_on_night
+
+      # ========================================
+      # Fall 2 - Automation Aktivierung / Abwesenheit erkannt
+      # ========================================
+      - alias: Fall 2 - Automation Aktivierung / Abwesenheit erkannt
+        conditions:
+          - condition: trigger
+            id:
+              - enable_switch_changed
+              - presence_cleared
+              - template_presence_cleared
+          - condition: template
+            value_template: "{{ dry_run_mode == false }}"
+        sequence:
+          # Ausschalt-Actions basierend auf Tag/Nacht
+          - choose:
+              # Fall 2.1: TAG (Switch ON)
+              - alias: Fall 2.1 - Tag & Abwesenheit
+                conditions:
+                  - condition: template
+                    value_template: "{{ is_state(day_night_switch, 'on') }}"
+                sequence:
+                  - choose: []
+                    default: !input action_turn_off_day
+                  - choose: []
+                    default: !input action_turn_off_always
+              
+              # Fall 2.2: NACHT (Switch OFF)
+              - alias: Fall 2.2 - Nacht & Abwesenheit
+                conditions:
+                  - condition: template
+                    value_template: "{{ is_state(day_night_switch, 'off') }}"
+                sequence:
+                  - choose: []
+                    default: !input action_turn_off_night
+                  - choose: []
+                    default: !input action_turn_off_always
+
+            # Fall 2.3: Kein Tag/Nacht (Default)
+            default: !input action_turn_off_always
+
+      # ========================================
+      # Fall 3 - Tür öffnet / Anwesenheit erkannt
+      # ========================================
+      - alias: Fall 3 - Türe öffnet / Anwesenheit erkannt
+        conditions:
+          - condition: and
+            conditions:
+              - condition: trigger
+                id:
+                  - door_opened
+                  - template_presence_detected
+                  - presence_detected
+              - condition: template
+                value_template: "{{ dry_run_mode == false }}"
+
+        sequence:
+          # Einschalten mit Tag/Nacht/Always
+          - choose:
+              # Fall 3.1: TAG
+              - alias: Fall 3.1 - Tag & Einschalten
+                conditions:
+                  - condition: template
+                    value_template: "{{ is_state(day_night_switch, 'on') and is_state(controlled_entity, 'off') }}"
+                sequence:
+                  - choose: []
+                    default: !input action_turn_on_day
+                  - choose: []
+                    default: !input action_turn_on_always
+
+              # Fall 3.2: NACHT
+              - alias: Fall 3.2 - Nacht & Einschalten
+                conditions:
+                  - condition: template
+                    value_template: "{{ is_state(day_night_switch, 'off') and is_state(controlled_entity, 'off') }}"
+                sequence:
+                  - choose: []
+                    default: !input action_turn_on_night
+                  - choose: []
+                    default: !input action_turn_on_always
+
+              # Fall 3.3: Kein Tag/Nacht
+              - alias: Fall 3.3 - Kein Tag/Nacht gewählt
+                conditions:
+                  - condition: template
+                    value_template: "{{ is_state(controlled_entity, 'off') }}"
+                sequence:
+                  - choose: []
+                    default: !input action_turn_on_always
+
+            # Fall 3.4: Zu steuernde Entity bereits on (Default)
+            default: []
+
+      # ========================================
+      # Fall 4 - Türe wird geschlossen
+      # ========================================
+      - alias: Fall 4 - Türe wird geschlossen
+        conditions:
+          - condition: trigger
+            id:
+              - door_closed
+              - door_opened
+              - controlled_entity_turned_on
+          - condition: template
+            value_template: "{{ dry_run_mode == false }}"
+          - condition: template
+            value_template: "{{ is_state(controlled_entity, 'on') }}"
+            alias: controlled_entity ist eingeschaltet
+        sequence:
+          # Wait: für Bewegungserkennung
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input manual_sensors
+                to: "on"
+            timeout: "{{ sensor_delay + 5 }}"
+            continue_on_timeout: true
+          
+          # Wenn Bewegung in Wait ODER Anwesenheit vorhanden
+          - if:
+              - condition: or
+                conditions:  
+                  - alias: Anwesenheit getriggert
+                    condition: template
+                    value_template: "{{ wait.trigger != none }}"
+                  - alias: Anwesenheit vorhanden
+                    condition: template
+                    value_template: >-
+                      {% if manual_sensors | length > 0 %}
+                        {{ manual_sensors | expand | rejectattr('state', 'in', ['unavailable', 'unknown']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+                      {% else %}
+                        {{ not filtered_sensors_template_off }}
+                      {% endif %}
+            then: []
+
+            # Keine Bewegung in Wait UND keine Anwesenheit vorhanden
+            else:
+              - choose:
+                  # Fall 4.1: TAG
+                  - alias: Fall 4.1 - Tag & Ausschalten
+                    conditions:
+                      - condition: template
+                        value_template: "{{ is_state(day_night_switch, 'on') }}"
+                    sequence:
+                      - choose: []
+                        default: !input action_turn_off_day
+                      - choose: []
+                        default: !input action_turn_off_always
+
+                  # Fall 4.2: NACHT
+                  - alias: Fall 4.2 - Nacht & Ausschalten
+                    conditions:
+                      - condition: template
+                        value_template: "{{ is_state(day_night_switch, 'off') }}"
+                    sequence:
+                      - choose: []
+                        default: !input action_turn_off_night
+                      - choose: []
+                        default: !input action_turn_off_always
+
+                # Fall 4.3: Kein Tag/Nacht (Default)
+                default:
+                  - choose: []
+                    default: !input action_turn_off_always
+
+      # ========================================
+      # Fall 5 - Dry-Run
+      # ========================================
+    default:
+      - if:
+          - condition: template
+            value_template: "{{ dry_run_mode == true }}"
+        then:
+          - service: persistent_notification.create
+            data:
+              title: "{{ automation_name }} - Probelauf"
+              message: >-
+                **Automation:** {{ automation_name }}
+            
+                **Zustände der berücksichtigten Sensoren:**
+                {% if manual_sensors | length > 0 %}
+                {% for sensor in manual_sensors %}
+                {{ "\n" }}• {{ sensor }}: {{ states(sensor) }}
+                {% endfor %}
+                {% else %}
+                {% set ns = namespace(entities=[]) %}
+                {% if filtered_sensors_template_on != '' %}
+                {% set on_entities = namespace(found=[]) %}
+                {% for entity in states.binary_sensor %}
+                {% if entity.attributes.device_class in ['motion', 'occupancy', 'presence'] %}
+                {% if entity.state == 'on' %}
+                {% set on_entities.found = on_entities.found + [entity.entity_id] %}
+                {% endif %}
+                {% endif %}
+                {% endfor %}
+                {% set ns.entities = (ns.entities + on_entities.found) | unique | list %}
+                {% endif %}
+                {% if filtered_sensors_template_off != '' %}
+                {% set off_entities = namespace(found=[]) %}
+                {% for entity in states.binary_sensor %}
+                {% if entity.attributes.device_class in ['motion', 'occupancy', 'presence'] %}
+                {% if entity.state == 'off' %}
+                {% set off_entities.found = off_entities.found + [entity.entity_id] %}
+                {% endif %}
+                {% endif %}
+                {% endfor %}
+                {% set ns.entities = (ns.entities + off_entities.found) | unique | list %}
+                {% endif %}
+                {% if ns.entities | length > 0 %}
+                {% for sensor in ns.entities %}
+                {{ "\n" }}• {{ sensor }}: {{ states(sensor) }}
+                {% endfor %}
+                {% else %}
+                {{ "\n" }}⚠️ Keine Melder und keine Templates konfiguriert!
+                {% endif %}
+                {% endif %}
+            
+                **Anwesenheitserkennung:**
+                {% if manual_sensors | length > 0 %}
+                {% if manual_sensors | expand | map(attribute='state') | select('eq', 'on') | list | count > 0 %}
+                {{ "\n" }}✅ Anwesenheit erkannt (mindestens ein Sensor ON)
+                {% else %}
+                {{ "\n" }}❌ Keine Anwesenheit (alle Sensoren OFF)
+                {% endif %}
+                {% else %}
+                {% if filtered_sensors_template_on %}
+                {{ "\n" }}✅ Anwesenheit erkannt
+                {% else %}
+                {{ "\n" }}❌ Keine Anwesenheit
+                {% endif %}
+                {% endif %}
+            
+                **Tag/Nacht Status:**
+                {% if day_night_switch != 'sun.sun' %}
+                {{ "\n" }}• {{ day_night_switch }}: {{ states(day_night_switch) }}
+                {% if is_state(day_night_switch, 'on') %}
+                {{ "\n" }}→ TAG-Modus
+                {% else %}
+                {{ "\n" }}→ NACHT-Modus
+                {% endif %}
+                {% else %}
+                {{ "\n" }}• Keine Tag/Nacht Unterscheidung
+                {% endif %}
+            
+                **Automation Aktivierung:**
+                {% if enable_switches | length > 0 %}
+                {% for entity in enable_switches %}
+                {{ "\n" }}• {{ entity }}: {{ states(entity) }}
+                {% endfor %}
+                {% set all_on = expand(enable_switches) | selectattr('state', 'eq', 'off') | list | length == 0 %}
+                {% if all_on %}
+                {{ "\n" }}✅ Automation ist AKTIV (alle ON)
+                {% else %}
+                {{ "\n" }}❌ Automation ist INAKTIV (nicht alle ON)
+                {% endif %}
+                {% else %}
+                {{ "\n" }}• Keine Aktivierungsbedingung
+                {% endif %}
+            
+                **Würde ausführen:**
+                {% if manual_sensors | length > 0 %}
+                {% set presence = manual_sensors | expand | map(attribute='state') | select('eq', 'on') | list | count > 0 %}
+                {% else %}
+                {% set presence = filtered_sensors_template_on %}
+                {% endif %}
+                {% if presence %}
+                {{ "\n" }}[Bei Anwesenheit nach Verzögerung von {{ delay_turn_on }}s]
+                {% if day_night_switch != 'sun.sun' and is_state(day_night_switch, 'on') %}
+                {{ "\n" }}→ Einschalt-Action Tag
+                {{ "\n" }}→ Einschalt-Action Immer
+                {% elif day_night_switch != 'sun.sun' %}
+                {{ "\n" }}→ Einschalt-Action Nacht
+                {{ "\n" }}→ Einschalt-Action Immer
+                {% else %}
+                {{ "\n" }}→ Einschalt-Action Immer
+                {% endif %}
+                {% else %}
+                {{ "\n" }}[Bei Abwesenheit nach Verzögerung von {{ delay_turn_off }}s]
+                {% if day_night_switch != 'sun.sun' and is_state(day_night_switch, 'on') %}
+                {{ "\n" }}→ Ausschalt-Action Tag
+                {{ "\n" }}→ Ausschalt-Action Immer
+                {% elif day_night_switch != 'sun.sun' %}
+                {{ "\n" }}→ Ausschalt-Action Nacht
+                {{ "\n" }}→ Ausschalt-Action Immer
+                {% else %}
+                {{ "\n" }}→ Ausschalt-Action Immer
+                {% endif %}
+                {% endif %}
+        else: []
+
+mode: restart

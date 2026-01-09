@@ -1,0 +1,145 @@
+================================================================================
+TEMPLATE-BEISPIELE FÜR ANWESENHEITSERKENNUNG
+Home Assistant Blueprint - Präsenz-basierte Gerätesteuerung
+================================================================================
+
+Alle Templates geben TRUE zurück wenn mindestens ein Sensor ON ist.
+Für Abwesenheit: Am Ende "| count > 0" durch "| count == 0" ersetzen.
+
+================================================================================
+
+1. ENTITIES AUS BEREICH: "Bereich 1"
+================================================================================
+
+{{ area_entities('Bereich 1') | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+2. ENTITIES AUS BEREICHE: "Bereich 1" UND "Bereich 2"
+================================================================================
+
+{{ (area_entities('Bereich 1') + area_entities('Bereich 2')) | unique | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+3. ENTITIES MIT LABEL: "Label 1"
+================================================================================
+
+{{ label_entities('Label 1') | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+4. ENTITIES MIT LABEL: "Label 1" UND "Label 2" 
+   (Entity muss ALLE Labels besitzen)
+================================================================================
+
+{% set ns = namespace(entities=[]) %}
+{% set ns.entities = label_entities('Label 1') | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 2')) | list %}
+{{ ns.entities | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+5. ENTITIES MIT LABEL: "Label 1" UND "Label 2" UND "Label 3"
+   (Entity muss ALLE Labels besitzen)
+================================================================================
+
+{% set ns = namespace(entities=[]) %}
+{% set ns.entities = label_entities('Label 1') | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 2')) | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 3')) | list %}
+{{ ns.entities | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+6. ENTITIES MIT LABEL: "Label 1" UND "Label 2" AUSSER "Label 3"
+================================================================================
+
+{% set ns = namespace(entities=[]) %}
+{% set ns.entities = label_entities('Label 1') | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 2')) | list %}
+{% set ns.entities = ns.entities | reject('in', label_entities('Label 3')) | list %}
+{{ ns.entities | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+7. ENTITIES AUS BEREICH: "Bereich 1" INKL. "Label 1"
+================================================================================
+
+{% set ns = namespace(entities=[]) %}
+{% set ns.entities = area_entities('Bereich 1') | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 1')) | list %}
+{{ ns.entities | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+8. ENTITIES AUS BEREICH: "Bereich 1" INKL. "Label 1" UND "Label 2"
+   (Entity muss ALLE Labels besitzen)
+================================================================================
+
+{% set ns = namespace(entities=[]) %}
+{% set ns.entities = area_entities('Bereich 1') | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 1')) | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 2')) | list %}
+{{ ns.entities | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+9. ENTITIES AUS BEREICH: "Bereich 1" INKL. "Label 1" UND "Label 2" 
+   AUSSER "Label 3"
+   (Entity muss ALLE Labels besitzen)
+================================================================================
+
+{% set ns = namespace(entities=[]) %}
+{% set ns.entities = area_entities('Bereich 1') | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 1')) | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 2')) | list %}
+{% set ns.entities = ns.entities | reject('in', label_entities('Label 3')) | list %}
+{{ ns.entities | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+
+10. ENTITIES AUS BEREICHE: "Bereich 1" UND "Bereich 2" 
+    INKL. "Label 1" UND "Label 2" AUSSER "Label 3"
+    (Entity muss ALLE Labels besitzen)
+================================================================================
+
+{% set ns = namespace(entities=[]) %}
+{% set ns.entities = (area_entities('Bereich 1') + area_entities('Bereich 2')) | unique | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 1')) | list %}
+{% set ns.entities = ns.entities | select('in', label_entities('Label 2')) | list %}
+{% set ns.entities = ns.entities | reject('in', label_entities('Label 3')) | list %}
+{{ ns.entities | expand | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'in', ['motion', 'occupancy', 'presence']) | map(attribute='state') | select('eq', 'on') | list | count > 0 }}
+
+
+================================================================================
+HINWEISE
+================================================================================
+
+FÜR ABWESENHEIT:
+Am Ende jedes Templates "| count > 0" durch "| count == 0" ersetzen.
+
+ANPASSUNGEN:
+- "Bereich 1", "Bereich 2" durch deine Bereichsnamen ersetzen
+- "Label 1", "Label 2", "Label 3" durch deine Label-Namen ersetzen
+
+DEVICE CLASSES:
+Die Templates filtern automatisch nach:
+- motion (Bewegungsmelder)
+- occupancy (Belegungsmelder)
+- presence (Präsenzmelder)
+
+WICHTIG:
+Nach Änderungen an Labels muss Home Assistant neu gestartet werden oder
+die Aktion "homeassistant.reload_config_entry" ausgeführt werden!
+
+================================================================================
