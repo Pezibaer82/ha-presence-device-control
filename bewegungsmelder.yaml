@@ -8,9 +8,10 @@ blueprint:
     Beispieltemplates findest du in der Readme.
     Anschließend wird/werden die unten angegebenen Actionen ausgeführt.
     Eine mögliche Tag/Nacht Unterscheidung erfolgt über einen on/off-Entität (ON=Tag, OFF=Nacht).
-    Version: 2026.01.09c
+    Version: 2026.01.09d
   domain: automation
   author: Pezibaer82
+  source_url: https://github.com/Pezibaer82/ha-presence-device-control
   input:
 
     # === Filter-Einstellungen ===
