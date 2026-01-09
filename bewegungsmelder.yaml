@@ -5,10 +5,10 @@ blueprint:
     Anwesenheit wird erkannt indem einer der ausgewählten Bewegungs- und/oder Präsenzmelder diese erkennt.
     Die Abwesenheit wird erkannt, wenn ALLE ausgewählten Bewegungs- und/oder Präsenzmelder diese erkennen.
     Die Auswahl der Bewegungssensoren kann entwerder einzeln (manuell) erfolgen, oder über selbst geschriebene Templates.
-    Beispieltemplates findest du in der Readme.
+    Beispieltemplates findest du in der [Readme](https://github.com/Pezibaer82/ha-presence-device-control/blob/main/README.md).
     Anschließend wird/werden die unten angegebenen Actionen ausgeführt.
     Eine mögliche Tag/Nacht Unterscheidung erfolgt über einen on/off-Entität (ON=Tag, OFF=Nacht).
-    Version: 2026.01.09d
+    Version: 2026.01.09e
   domain: automation
   author: Pezibaer82
   source_url: https://github.com/Pezibaer82/ha-presence-device-control
