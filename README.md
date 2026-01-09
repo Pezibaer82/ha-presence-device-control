@@ -1,6 +1,6 @@
 # Präsenz-basierte Gerätesteuerung
 
-**Version:** 2026.01.09c  
+**Version:** 2026.01.09e  
 **Autor:** Pezibaer82  
 **Typ:** Home Assistant Blueprint
 
