@@ -335,8 +335,23 @@ trigger:
     id: ha_start
     alias: "Home Assistant: Neustart"
 
-condition:
-  - condition: or
+conditions:
+  - alias: wenn enable_switches ALLE Status "on" besitzen
+    condition: or
+    conditions:
+      - alias: Automation aktiviert - alle enable_switches müssen ON sein
+        condition: template
+        value_template: |-
+          {% if enable_switches | length > 0 %}
+            {{ expand(enable_switches) | selectattr('state', 'eq', 'off') | list | length == 0 }}
+          {% else %}
+            True
+          {% endif %}
+      - condition: trigger
+        id:
+          - enable_switch_changed
+  - alias: allgemeine Triggerbedingungen
+    condition: or
     conditions:
       - alias: Manueller-Sensor-Anwesenheit
         condition: and
@@ -352,7 +367,6 @@ condition:
                 true
               {% endif %}
             alias: nur wenn Türen geöffnet sind
-      
       - alias: "Template-Sensor-Anwesenheit "
         condition: and
         conditions:
@@ -370,7 +384,6 @@ condition:
                 true
               {% endif %}
             alias: nur wenn Türen geöffnet sind
-      
       - alias: Manueller-Sensor-Abwesenheit
         condition: and
         conditions:
@@ -391,7 +404,6 @@ condition:
                 true
               {% endif %}
             alias: nur wenn Türen geöffnet sind
-      
       - alias: Template-Sensor-Abwesenheit
         condition: and
         conditions:
@@ -409,7 +421,6 @@ condition:
                 true
               {% endif %}
             alias: nur wenn Türen geöffnet sind
-      
       - alias: Day/Night Wechsel
         condition: and
         conditions:
@@ -419,31 +430,6 @@ condition:
           - condition: template
             value_template: "{{ day_night_switch != 'sun.sun' }}"
             alias: Nur wenn "Tag/Nacht Erkennung" nicht sun.sun
-      
-      - alias: Automation Ein-/Ausschalten
-        condition: and
-        conditions:
-          - condition: trigger
-            id:
-              - enable_switch_changed
-          - condition: template
-            value_template: |-
-              {% if enable_switches | length > 0 %}
-                {{ expand(enable_switches) | selectattr('state', 'eq', 'off') | list | length == 0 }}
-              {% else %}
-                false
-              {% endif %}
-            alias: Nur wenn Alle switchen "on" sind, oder default angegeben
-          - condition: template
-            value_template: |-
-              {% if manual_sensors | length > 0 %}
-                {{ manual_sensors | expand | rejectattr('state', 'in', ['unavailable', 'unknown']) | map(attribute='state') | select('eq', 'on') | list | count == 0 }}
-              {% else %}
-                {{ not filtered_sensors_template_on }}
-              {% endif %}
-            alias: nur bei Abwesenheit
-      
-      
       - alias: Gesteuerte Entity eingeschaltet bei Abwesenheit
         condition: and
         conditions:
@@ -452,22 +438,19 @@ condition:
               - controlled_entity_turned_on
           - condition: or
             conditions:
-              # Manuelle Sensoren: Alle OFF
               - condition: and
                 conditions:
                   - condition: template
                     value_template: "{{ manual_sensors | length > 0 }}"
                     alias: manuelle Sensoren sind ausgewählt
                   - condition: template
-                    value_template: >-
+                    value_template: |-
                       {{ manual_sensors | expand 
                          | rejectattr('state', 'in', ['unavailable', 'unknown']) 
                          | map(attribute='state') 
                          | select('eq', 'on') 
                          | list | length == 0 }}
                     alias: alle manuellen Sensoren zeigen Abwesenheit
-              
-              # Template-Sensor: OFF
               - condition: and
                 conditions:
                   - condition: template
@@ -486,16 +469,20 @@ condition:
           - condition: template
             value_template: "{{ controlled_entity != '' }}"
             alias: nur wenn "Zu steuernde Entity" angegeben
-  
-  - condition: template
-    value_template: |-
-      {% if enable_switches | length > 0 %}
-        {{ expand(enable_switches) | selectattr('state', 'eq', 'off') | list | length == 0 }}
-      {% else %}
-        true
-      {% endif %}
-    alias: Automation Aktivierung - alle enable_switches müssen ON sein
-
+      - alias: Automation Deaktivieren
+        condition: and
+        conditions:
+          - condition: trigger
+            id:
+              - enable_switch_changed
+          - alias: Automation Deaktivierung - mind. ein enable_switch muss OFF sein
+            condition: template
+            value_template: |-
+              {% if enable_switches | length > 0 %}
+                {{ expand(enable_switches) | selectattr('state', 'eq', 'off') | list | length > 0 }}
+              {% else %}
+                True
+              {% endif %}
 action:
   - choose:
 
